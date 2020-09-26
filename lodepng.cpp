@@ -31,8 +31,12 @@ Rename this file to lodepng.cpp to use it for C++, or to lodepng.c to use it for
 #include "lodepng.h"
 
 #ifdef LODEPNG_COMPILE_DISK
-#include <limits.h> /* LONG_MAX */
-#include <stdio.h> /* file handling */
+  #include <limits.h> /* LONG_MAX */
+  #ifdef LODEPNG_SPIFFS //Define this for use SPIFFS instead stdio // Corrado
+  #include "SPIFFS.h"
+  #else
+  #include <stdio.h> /* file handling */
+  #endif
 #endif /* LODEPNG_COMPILE_DISK */
 
 #ifdef LODEPNG_COMPILE_ALLOCATORS
@@ -342,35 +346,52 @@ static void lodepng_set32bitInt(unsigned char* buffer, unsigned value) {
 
 /* returns negative value on error. This should be pure C compatible, so no fstat. */
 static long lodepng_filesize(const char* filename) {
-  FILE* file;
+
   long size;
-  file = fopen(filename, "rb");
-  if(!file) return -1;
+  #ifdef LODEPNG_SPIFFS // Use SPIFFS // Corrado
+    fs::File file = SPIFFS.open(filename, "r");
+    if(!file) return -1;
+    size = file.size();
+    file.close();
+  #else                 // Use stdio // Corrado
+    FILE* file;
+    file = fopen(filename, "rb");
+    if(!file) return -1;
 
-  if(fseek(file, 0, SEEK_END) != 0) {
+    if(fseek(file, 0, SEEK_END) != 0) {
+      fclose(file);
+      return -1;
+    }
+
+    size = ftell(file);
     fclose(file);
-    return -1;
-  }
+  #endif
 
-  size = ftell(file);
-  /* It may give LONG_MAX as directory size, this is invalid for us. */
-  if(size == LONG_MAX) size = -1;
+    /* It may give LONG_MAX as directory size, this is invalid for us. */
+    if(size == LONG_MAX) size = -1;
 
-  fclose(file);
   return size;
 }
 
 /* load file into buffer that already has the correct allocated size. Returns error code.*/
 static unsigned lodepng_buffer_file(unsigned char* out, size_t size, const char* filename) {
-  FILE* file;
+    
   size_t readsize;
-  file = fopen(filename, "rb");
-  if(!file) return 78;
+  #ifdef LODEPNG_SPIFFS // Use SPIFFS // Corrado
+    fs::File file = SPIFFS.open(filename, "r");
+    if(!file) return 78;
+    readsize = file.size();
+    file.close();
+  #else                 // Use stdio // Corrado
+    FILE* file;
+    file = fopen(filename, "rb");
+    if(!file) return 78;
 
-  readsize = fread(out, 1, size, file);
-  fclose(file);
+    readsize = fread(out, 1, size, file);
+    fclose(file);
+  #endif 
 
-  if(readsize != size) return 78;
+  if (readsize != size) return 78;
   return 0;
 }
 
@@ -387,11 +408,19 @@ unsigned lodepng_load_file(unsigned char** out, size_t* outsize, const char* fil
 
 /*write given buffer to the file, overwriting the file, it doesn't append to it.*/
 unsigned lodepng_save_file(const unsigned char* buffer, size_t buffersize, const char* filename) {
-  FILE* file;
-  file = fopen(filename, "wb" );
-  if(!file) return 79;
-  fwrite(buffer, 1, buffersize, file);
-  fclose(file);
+    
+  #ifdef LODEPNG_SPIFFS // Use SPIFFS // Corrado
+    fs::File file = SPIFFS.open(filename, "w");
+    if(!file) return 79;
+    file.write(buffer, buffersize);
+    file.close();
+  #else                 // Use stdio // Corrado
+    FILE* file;
+    file = fopen(filename, "wb" );
+    if(!file) return 79;
+    fwrite(buffer, 1, buffersize, file);
+    fclose(file);
+  #endif
   return 0;
 }
 
