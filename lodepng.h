@@ -27,7 +27,7 @@ freely, subject to the following restrictions:
 #define LODEPNG_H
 
 #include <string.h> /*for size_t*/
-
+#define LODEPNG_SPIFFS //Define this for use SPIFFS instead stdio. //Corrado
 extern const char* LODEPNG_VERSION_STRING;
 
 /*
